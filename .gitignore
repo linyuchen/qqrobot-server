@@ -1,0 +1,6 @@
+.idea/
+*onefile-build/
+*dist/
+*build/
+venv/
+*.exe
