@@ -1,4 +1,5 @@
-pywinauto
-pillow
-flask
+pywinauto~=0.6.8
+pillow~=9.5.0
+flask~=2.3.2
 nuitka
+pywin32~=306
