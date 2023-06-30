@@ -34,53 +34,83 @@ class Message(TypedDict):
     data: list[MessageData]
 
 
-def paste(data, is_image):
+def paste(data, is_image, win=None):
     try:
         win32clipboard.OpenClipboard()
         win32clipboard.EmptyClipboard()
     except:
-        paste(data, is_image)
+        paste(data, is_image, win)
         return
     try:
         if is_image:
             win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
         else:
-            if len(data) > TEXT_MAX_LEN:
-                data = data[:TEXT_MAX_LEN]
             win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, data)
     except:
-        paste(data, is_image)
+        paste(data, is_image, win)
         return
     # keyboard.send_keys("^v")  # 这个在Hyper-V虚拟机中不好使
-    win32api.keybd_event(17, 0, 0, 0)                           # ctrl的键位码是17
-    win32api.keybd_event(86, 0, 0, 0)                           # v的键位码是86
-    win32api.keybd_event(86, 0, win32con.KEYEVENTF_KEYUP, 0)    # 释放按键
-    win32api.keybd_event(17, 0, win32con.KEYEVENTF_KEYUP, 0)
-
+    win32api.PostMessage(win, win32con.WM_PASTE, 0, 0)
+    # win32api.keybd_event(17, 0, 0, 0)                           # ctrl的键位码是17
+    # time.sleep(0.1)
+    # win32api.keybd_event(86, 0, 0, 0)                           # v的键位码是86
+    # time.sleep(0.1)
+    # win32api.keybd_event(86, 0, win32con.KEYEVENTF_KEYUP, 0)    # 释放按键
+    # win32api.keybd_event(17, 0, win32con.KEYEVENTF_KEYUP, 0)
+    if not is_image:
+        if len(data) >= TEXT_MAX_LEN:  # 如果是长文本，先发送，不然文字太多不允许发送
+            time.sleep(0.5)
+            keyboard.send_keys("{ENTER}")
     try:
         win32clipboard.CloseClipboard()
     except:
         pass
 
 
+def split_long_msg(msg: Message) -> Message:
+    new_msg = Message(qq_group_name=msg["qq_group_name"], data=[])
+    for msg_data in msg["data"]:
+        if msg_data.get("type") in [MsgType.TEXT.value, MsgType.TEXT]:
+            text = msg_data["data"]
+            if len(text) >= TEXT_MAX_LEN:
+                for i in range(0, len(text), TEXT_MAX_LEN):
+                    new_msg["data"].append({
+                        "type": MsgType.TEXT, "data": text[i:i + TEXT_MAX_LEN]})
+            else:
+                new_msg["data"].append(msg_data)
+        else:
+            new_msg["data"].append(msg_data)
+    return new_msg
+
+
 def send_msg(msg: Message):
     interval = 1
     window_handle = win32gui.FindWindow(None, msg["qq_group_name"])
-    win32gui.SetForegroundWindow(window_handle)
+    try_count = 0
+    while True:
+        if try_count >= 5:
+            raise Exception("找不到窗口")
+        try:
+            try_count += 1
+            win32gui.SetForegroundWindow(window_handle)
+            break
+        except:
+            traceback.print_exc()
+            time.sleep(interval)
     time.sleep(interval)
-
+    msg = split_long_msg(msg)
     for msg_data in msg["data"]:
-        if msg_data.get("type") == MsgType.TEXT.value:
+        if msg_data.get("type") in [MsgType.TEXT.value, MsgType.TEXT]:
             text = msg_data["data"]
-            paste(text, False)
-        elif msg_data.get("type") == MsgType.IMAGE.value:
+            paste(text, False, window_handle)
+        elif msg_data.get("type") in [MsgType.IMAGE, MsgType.IMAGE.value]:
             image_data = base64.decodebytes(msg_data["data"].encode("utf-8"))
             fp = BytesIO(image_data)
             im = Image.open(fp)
             output = BytesIO()
             im.save(output, format="BMP")
             data = output.getvalue()[14:]
-            paste(data, True)
+            paste(data, True, window_handle)
             time.sleep(1)
         time.sleep(interval)
 
@@ -119,20 +149,13 @@ def handle_queue():
         time.sleep(0.1)
 
 
-# 创建一个新线程，用于处理消息队列
-queue_thread = threading.Thread(target=handle_queue)
-# queue_thread.daemon = True
-queue_thread.start()
+def main():
+    # 创建一个新线程，用于处理消息队列
+    queue_thread = threading.Thread(target=handle_queue)
+    # queue_thread.daemon = True
+    queue_thread.start()
+    app.run(host='0.0.0.0', port=8088)
+
 
 if __name__ == '__main__':
-    test_msg = Message(qq_group_name="test group", data=[{"type": MsgType.TEXT, "data": "hello"}])
-    # send_msg("机器人test", msg)
-    # image_base64 = base64.b64encode(open("test.jpg", "rb").read()).decode("utf-8")
-    # test_msg = Message(qq_group_name="test group",
-    #                    data=[
-    #                        {"type": MsgType.TEXT, "data": "hellokitty"},
-    #                        {"type": MsgType.IMAGE, "data": image_base64},
-    #                        {"type": MsgType.TEXT, "data": "hellokitty"},
-    #                    ])
-    # send_msg(test_msg)
-app.run(host='0.0.0.0', port=8088)
+    main()
