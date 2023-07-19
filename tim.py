@@ -15,13 +15,13 @@ from PIL import Image
 from pywinauto import keyboard
 from flask import Flask, request
 
-
 TEXT_MAX_LEN = 3000
 
 
 class MsgType(Enum):
     TEXT = "Plain"
     IMAGE = "Image"
+    AT = "At"
 
 
 class MessageData(TypedDict):
@@ -75,7 +75,8 @@ def split_long_msg(msg: Message) -> Message:
             if len(text) >= TEXT_MAX_LEN:
                 for i in range(0, len(text), TEXT_MAX_LEN):
                     new_msg["data"].append({
-                        "type": MsgType.TEXT, "data": text[i:i + TEXT_MAX_LEN]})
+                        "type": MsgType.TEXT, "data": text[i:i + TEXT_MAX_LEN]
+                    })
             else:
                 new_msg["data"].append(msg_data)
         else:
@@ -100,24 +101,27 @@ def send_msg(msg: Message):
     time.sleep(interval)
     msg = split_long_msg(msg)
     for msg_data in msg["data"]:
-        if msg_data.get("type") in [MsgType.TEXT.value, MsgType.TEXT]:
-            text = msg_data["data"]
-            paste(text, False, window_handle)
-        elif msg_data.get("type") in [MsgType.IMAGE, MsgType.IMAGE.value]:
-            image_data = base64.decodebytes(msg_data["data"].encode("utf-8"))
-            fp = BytesIO(image_data)
-            im = Image.open(fp)
-            output = BytesIO()
-            im.save(output, format="BMP")
-            data = output.getvalue()[14:]
-            paste(data, True, window_handle)
-            time.sleep(1)
+        match msg_data.get("type"):
+            case MsgType.TEXT.value | MsgType.TEXT:
+                text = msg_data["data"]
+                paste(text, False, window_handle)
+            case MsgType.IMAGE | MsgType.IMAGE.value:
+                image_data = base64.decodebytes(msg_data["data"].encode("utf-8"))
+                fp = BytesIO(image_data)
+                im = Image.open(fp)
+                output = BytesIO()
+                im.save(output, format="BMP")
+                data = output.getvalue()[14:]
+                paste(data, True, window_handle)
+                time.sleep(1)
+            case MsgType.AT | MsgType.AT.value:
+                text = msg_data["data"]
+                paste(text, False, window_handle)
+                time.sleep(0.5)
+                keyboard.send_keys("{ENTER}")
         time.sleep(interval)
 
     keyboard.send_keys("{ENTER}")
-
-
-# 新建一个flask app，监听http请求，然后获取post的数据，然后调用send_msg函数
 
 
 app = Flask(__name__)
