@@ -119,6 +119,8 @@ def send_msg(msg: Message):
                 paste(text, False, window_handle)
                 time.sleep(0.5)
                 keyboard.send_keys("{ENTER}")
+                time.sleep(0.5)
+                keyboard.send_keys("+{ENTER}")
         time.sleep(interval)
 
     keyboard.send_keys("{ENTER}")
