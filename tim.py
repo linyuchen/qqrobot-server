@@ -1,9 +1,11 @@
 import base64
+
+import requests
 import time
 import queue
 import threading
 import traceback
-from enum import Enum
+from enum import StrEnum
 from io import BytesIO
 from typing import TypedDict
 
@@ -18,9 +20,10 @@ from flask import Flask, request
 TEXT_MAX_LEN = 3000
 
 
-class MsgType(Enum):
+class MsgType(StrEnum):
     TEXT = "Plain"
     IMAGE = "Image"
+    IMAGE_URL = "ImageUrl"
     AT = "At"
 
 
@@ -114,6 +117,15 @@ def send_msg(msg: Message):
                 data = output.getvalue()[14:]
                 paste(data, True, window_handle)
                 time.sleep(1)
+            case MsgType.IMAGE_URL:
+                url = msg_data["data"]
+                fp = BytesIO(requests.get(url).content)
+                im = Image.open(fp)
+                output = BytesIO()
+                im.save(output, format="BMP")
+                data = output.getvalue()[14:]
+                paste(data, True, window_handle)
+
             case MsgType.AT | MsgType.AT.value:
                 text = msg_data["data"]
                 paste(text, False, window_handle)

@@ -3,3 +3,4 @@ pillow~=9.5.0
 flask~=2.3.2
 nuitka
 pywin32~=306
+requests
