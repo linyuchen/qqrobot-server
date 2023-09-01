@@ -169,7 +169,7 @@ def handle_queue():
 
 def main():
     # 创建一个新线程，用于处理消息队列
-    queue_thread = threading.Thread(target=handle_queue)
+    queue_thread = threading.Thread(target=handle_queue, daemon=True)
     # queue_thread.daemon = True
     queue_thread.start()
     app.run(host='0.0.0.0', port=8088)
